@@ -71,6 +71,27 @@ app.get('/recipes', async (req, res) => {
   }
 });
 
+// GET a single recipe by its ID
+app.get('/recipes/:id', async (req, res) => {
+  try {
+    // Get the ID from the URL parameters
+    const recipeId = req.params.id;
+    const recipeRef = db.collection('recipes').doc(recipeId);
+    const doc = await recipeRef.get();
+
+    if (!doc.exists) {
+      // If no document is found, send a 404 error
+      res.status(404).send('Recipe not found');
+    } else {
+      // Send the document data back as JSON
+      res.json({ id: doc.id, ...doc.data() });
+    }
+  } catch (error) {
+    console.error("Error fetching single recipe:", error);
+    res.status(500).send("Error fetching recipe from database.");
+  }
+});
+
 // 6. Set the port and start the server
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
