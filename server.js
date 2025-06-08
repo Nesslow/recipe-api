@@ -3,31 +3,9 @@ const express = require('express');
 const admin = require('firebase-admin');
 const cors = require('cors');
 
-// --- START DEBUGGING BLOCK ---
-// This code will run the instant the server starts on Render.
-console.log("--- Recipe API Server Starting Up ---");
-console.log("Checking for environment variable 'FIREBASE_SERVICE_ACCOUNT'...");
-
-const serviceAccountJSON = process.env.FIREBASE_SERVICE_ACCOUNT;
-
-if (serviceAccountJSON) {
-    console.log("SUCCESS: Environment variable was FOUND.");
-    // We'll log the first 40 characters to confirm it's not empty, without exposing the private key.
-    console.log("Variable preview:", serviceAccountJSON.substring(0, 40));
-} else {
-    console.error("FATAL ERROR: Environment variable 'FIREBASE_SERVICE_ACCOUNT' was NOT FOUND.");
-    console.error("This is why the application is crashing. Please double-check the 'Environment' tab for your service on Render.com.");
-    // If the key is missing in a production environment, we stop the app immediately.
-    if (process.env.NODE_ENV === 'production') {
-        process.exit(1);
-    }
-}
-// --- END DEBUGGING BLOCK ---
-
-
-// 2. Import your private Firebase key using the logic from above
-const serviceAccount = serviceAccountJSON
-  ? JSON.parse(serviceAccountJSON)
+// 2. Import your private Firebase key
+const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT
+  ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
   : require('./serviceAccountKey.json');
 
 
@@ -38,25 +16,24 @@ admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
 });
 
-// Get a reference to the Firestore database
 const db = admin.firestore();
 
-// 4. Set up Middleware
-app.use(cors());
-app.options('*', cors());
+// 4. Set up Middleware (Corrected and Simplified)
+// This single line, placed before your routes, handles all CORS logic including pre-flight.
+app.use(cors()); 
+// This middleware is for reading the JSON body of POST requests.
 app.use(express.json());
 
-// 5. Define your API endpoint
+
+// 5. Define your API endpoints
 app.get('/recipes', async (req, res) => {
   try {
     const recipesRef = db.collection('recipes');
     const snapshot = await recipesRef.get();
-
     if (snapshot.empty) {
       res.json([]);
       return;
     }
-
     const recipes = [];
     snapshot.forEach(doc => {
       recipes.push({
@@ -64,62 +41,46 @@ app.get('/recipes', async (req, res) => {
         ...doc.data()
       });
     });
-
     res.json(recipes);
-
   } catch (error) {
     console.error("Error fetching recipes:", error);
     res.status(500).send("Error fetching recipes from database.");
   }
 });
 
-// GET a single recipe by its ID
 app.get('/recipes/:id', async (req, res) => {
-  try {
-    // Get the ID from the URL parameters
-    const recipeId = req.params.id;
-    const recipeRef = db.collection('recipes').doc(recipeId);
-    const doc = await recipeRef.get();
-
-    if (!doc.exists) {
-      // If no document is found, send a 404 error
-      res.status(404).send('Recipe not found');
-    } else {
-      // Send the document data back as JSON
-      res.json({ id: doc.id, ...doc.data() });
+    try {
+      const recipeId = req.params.id;
+      const recipeRef = db.collection('recipes').doc(recipeId);
+      const doc = await recipeRef.get();
+      if (!doc.exists) {
+        res.status(404).send('Recipe not found');
+      } else {
+        res.json({ id: doc.id, ...doc.data() });
+      }
+    } catch (error) {
+      console.error("Error fetching single recipe:", error);
+      res.status(500).send("Error fetching recipe from database.");
     }
-  } catch (error) {
-    console.error("Error fetching single recipe:", error);
-    res.status(500).send("Error fetching recipe from database.");
-  }
-});
+  });
 
-// POST a new recipe to the database
 app.post('/recipes', async (req, res) => {
-  try {
-    // Get the recipe data sent from the front-end form
-    const newRecipe = req.body;
-
-    // Add some basic validation to ensure essential fields are present
-    if (!newRecipe.title || !newRecipe.ingredients || !newRecipe.instructions) {
-      return res.status(400).send({ message: 'Missing required fields: title, ingredients, or instructions.' });
+    try {
+      const newRecipe = req.body;
+      if (!newRecipe.title || !newRecipe.ingredients || !newRecipe.instructions) {
+        return res.status(400).send({ message: 'Missing required fields: title, ingredients, or instructions.' });
+      }
+      const docRef = await db.collection('recipes').add(newRecipe);
+      res.status(201).send({ message: `Recipe created successfully with ID: ${docRef.id}` });
+    } catch (error) {
+      console.error("Error creating recipe:", error);
+      res.status(500).send({ message: "Error creating recipe in database." });
     }
+  });
 
-    // Add the new recipe document to the 'recipes' collection in Firestore
-    const docRef = await db.collection('recipes').add(newRecipe);
-
-    // Send back a success response
-    res.status(201).send({ message: `Recipe created successfully with ID: ${docRef.id}` });
-
-  } catch (error) {
-    console.error("Error creating recipe:", error);
-    res.status(500).send({ message: "Error creating recipe in database." });
-  }
-});
 
 // 6. Set the port and start the server
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
-  console.log(`Try visiting http://localhost:${PORT}/recipes in your browser.`);
 });
