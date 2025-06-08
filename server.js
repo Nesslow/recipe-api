@@ -3,8 +3,33 @@ const express = require('express');
 const admin = require('firebase-admin');
 const cors = require('cors');
 
-// 2. Import your private Firebase key
-const serviceAccount = require('./serviceAccountKey.json');
+// --- START DEBUGGING BLOCK ---
+// This code will run the instant the server starts on Render.
+console.log("--- Recipe API Server Starting Up ---");
+console.log("Checking for environment variable 'FIREBASE_SERVICE_ACCOUNT'...");
+
+const serviceAccountJSON = process.env.FIREBASE_SERVICE_ACCOUNT;
+
+if (serviceAccountJSON) {
+    console.log("SUCCESS: Environment variable was FOUND.");
+    // We'll log the first 40 characters to confirm it's not empty, without exposing the private key.
+    console.log("Variable preview:", serviceAccountJSON.substring(0, 40));
+} else {
+    console.error("FATAL ERROR: Environment variable 'FIREBASE_SERVICE_ACCOUNT' was NOT FOUND.");
+    console.error("This is why the application is crashing. Please double-check the 'Environment' tab for your service on Render.com.");
+    // If the key is missing in a production environment, we stop the app immediately.
+    if (process.env.NODE_ENV === 'production') {
+        process.exit(1);
+    }
+}
+// --- END DEBUGGING BLOCK ---
+
+
+// 2. Import your private Firebase key using the logic from above
+const serviceAccount = serviceAccountJSON
+  ? JSON.parse(serviceAccountJSON)
+  : require('./serviceAccountKey.json');
+
 
 // 3. Initialize the Express app and Firebase Admin SDK
 const app = express();
@@ -17,39 +42,31 @@ admin.initializeApp({
 const db = admin.firestore();
 
 // 4. Set up Middleware
-// This allows your front-end to make requests to this API
 app.use(cors());
 
-// 5. Define your first API endpoint (to get all recipes)
+// 5. Define your API endpoint
 app.get('/recipes', async (req, res) => {
   try {
-    // Get a reference to the 'recipes' collection
     const recipesRef = db.collection('recipes');
-    // Get all documents from the collection
     const snapshot = await recipesRef.get();
 
-    // If there are no recipes, return an empty array
     if (snapshot.empty) {
       res.json([]);
       return;
     }
 
-    // Create an array to hold our recipes
     const recipes = [];
-    // Loop through each document and format it
     snapshot.forEach(doc => {
       recipes.push({
-        id: doc.id,          // The unique document ID
-        ...doc.data()      // The rest of the recipe data (title, ingredients, etc.)
+        id: doc.id,
+        ...doc.data()
       });
     });
 
-    // Send the array of recipes back as a JSON response
     res.json(recipes);
 
   } catch (error) {
     console.error("Error fetching recipes:", error);
-    // Send a server error status code if something goes wrong
     res.status(500).send("Error fetching recipes from database.");
   }
 });
