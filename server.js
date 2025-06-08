@@ -43,6 +43,7 @@ const db = admin.firestore();
 
 // 4. Set up Middleware
 app.use(cors());
+app.options('*', cors());
 app.use(express.json());
 
 // 5. Define your API endpoint
