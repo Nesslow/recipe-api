@@ -43,6 +43,7 @@ const db = admin.firestore();
 
 // 4. Set up Middleware
 app.use(cors());
+app.use(express.json());
 
 // 5. Define your API endpoint
 app.get('/recipes', async (req, res) => {
@@ -89,6 +90,29 @@ app.get('/recipes/:id', async (req, res) => {
   } catch (error) {
     console.error("Error fetching single recipe:", error);
     res.status(500).send("Error fetching recipe from database.");
+  }
+});
+
+// POST a new recipe to the database
+app.post('/recipes', async (req, res) => {
+  try {
+    // Get the recipe data sent from the front-end form
+    const newRecipe = req.body;
+
+    // Add some basic validation to ensure essential fields are present
+    if (!newRecipe.title || !newRecipe.ingredients || !newRecipe.instructions) {
+      return res.status(400).send({ message: 'Missing required fields: title, ingredients, or instructions.' });
+    }
+
+    // Add the new recipe document to the 'recipes' collection in Firestore
+    const docRef = await db.collection('recipes').add(newRecipe);
+
+    // Send back a success response
+    res.status(201).send({ message: `Recipe created successfully with ID: ${docRef.id}` });
+
+  } catch (error) {
+    console.error("Error creating recipe:", error);
+    res.status(500).send({ message: "Error creating recipe in database." });
   }
 });
 
