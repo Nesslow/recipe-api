@@ -3,10 +3,11 @@ const express = require('express');
 const admin = require('firebase-admin');
 const cors = require('cors');
 
-// 2. Import your private Firebase key
+// 2. Get the service account credentials
 const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT
   ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
   : require('./serviceAccountKey.json');
+
 
 // 3. Initialize the Express app and Firebase Admin SDK
 const app = express();
@@ -17,10 +18,12 @@ admin.initializeApp({
 
 const db = admin.firestore();
 
-// 4. Set up Middleware
-app.use(cors());
-app.options('*', cors());
+// 4. Set up Middleware (Corrected and Simplified)
+// This single line, placed before your routes, handles all CORS logic.
+app.use(cors()); 
+// This middleware is for reading the JSON body of POST requests.
 app.use(express.json());
+
 
 // 5. Define your API endpoints
 app.get('/recipes', async (req, res) => {
@@ -28,8 +31,7 @@ app.get('/recipes', async (req, res) => {
     const recipesRef = db.collection('recipes');
     const snapshot = await recipesRef.get();
     if (snapshot.empty) {
-      res.json([]);
-      return;
+      return res.json([]);
     }
     const recipes = [];
     snapshot.forEach(doc => {
@@ -75,7 +77,6 @@ app.post('/recipes', async (req, res) => {
     }
   });
 
-// PUT (Update) an existing recipe by its ID
 app.put('/recipes/:id', async (req, res) => {
     try {
         const recipeId = req.params.id;
@@ -96,7 +97,6 @@ app.put('/recipes/:id', async (req, res) => {
     }
 });
 
-// DELETE a recipe by its ID
 app.delete('/recipes/:id', async (req, res) => {
     try {
         const recipeId = req.params.id;
@@ -110,6 +110,7 @@ app.delete('/recipes/:id', async (req, res) => {
         res.status(500).send({ message: "Error deleting recipe in database." });
     }
 });
+
 
 // 6. Set the port and start the server
 const PORT = process.env.PORT || 8080;
